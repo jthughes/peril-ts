@@ -8,8 +8,15 @@ import {
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandMove } from "../internal/gamelogic/move.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
-import { declareAndBind, SimpleQueueType } from "../internal/pubsub/publish.js";
-import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import { publishJSON, SimpleQueueType } from "../internal/pubsub/publish.js";
+import { subscribeJSON } from "../internal/pubsub/subscribe.js";
+import {
+  ArmyMovesPrefix,
+  ExchangePerilDirect,
+  ExchangePerilTopic,
+  PauseKey,
+} from "../internal/routing/routing.js";
+import { handlerMove, handlerPause } from "./handlers.js";
 
 async function main() {
   console.log("Starting Peril client...");
@@ -18,7 +25,7 @@ async function main() {
   const connection = await amqp.connect(connectionString);
 
   ["SIGINT", "SIGTERM"].forEach((signal) =>
-    process.on("SIGINT", async () => {
+    process.on(signal, async () => {
       console.log("Closing connection and shutting down...");
       try {
         await connection.close();
@@ -33,18 +40,30 @@ async function main() {
 
   const username = await clientWelcome();
 
-  const pauseQueue = await declareAndBind(
+  const state = new GameState(username);
+
+  await subscribeJSON(
     connection,
     ExchangePerilDirect,
     `${PauseKey}.${username}`,
     PauseKey,
     SimpleQueueType.Transient,
+    handlerPause(state),
   );
 
-  const state = new GameState(username);
+  await subscribeJSON(
+    connection,
+    ExchangePerilTopic,
+    `${ArmyMovesPrefix}.${username}`,
+    `${ArmyMovesPrefix}.*`,
+    SimpleQueueType.Transient,
+    handlerMove(state),
+  );
+
+  const confCh = await connection.createConfirmChannel();
 
   while (true) {
-    const userInput = await getInput();
+    const userInput = await getInput("> ");
     if (userInput.length == 0) {
       continue;
     }
@@ -67,6 +86,12 @@ async function main() {
     if (command == "move") {
       try {
         const move = commandMove(state, words);
+        publishJSON(
+          confCh,
+          ExchangePerilTopic,
+          `${ArmyMovesPrefix}.${username}`,
+          move,
+        );
       } catch (err) {
         if (err instanceof Error) {
           console.error("Error:", err.message);
