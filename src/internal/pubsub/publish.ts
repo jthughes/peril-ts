@@ -1,7 +1,7 @@
-import amqp, { type Channel, ConfirmChannel } from "amqplib";
+import amqp, { type Channel } from "amqplib";
 
 export async function publishJSON<T>(
-  ch: ConfirmChannel,
+  ch: amqp.ConfirmChannel,
   exchange: string,
   routingKey: string,
   value: T,

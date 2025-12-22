@@ -1,6 +1,16 @@
 import amqp from "amqplib";
-import { publishJSON } from "../internal/pubsub/publish.js";
-import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
+import {
+  declareAndBind,
+  publishJSON,
+  SimpleQueueType,
+} from "../internal/pubsub/publish.js";
+import {
+  ExchangePerilDirect,
+  ExchangePerilTopic,
+  GameLogSlug,
+  PauseKey,
+} from "../internal/routing/routing.js";
 
 async function main() {
   console.log("Starting Peril server...");
@@ -26,12 +36,49 @@ async function main() {
 
   const chConfirm = await connection.createConfirmChannel();
 
-  try {
-    await publishJSON(chConfirm, ExchangePerilDirect, PauseKey, {
-      isPaused: true,
-    });
-  } catch (err) {
-    console.error("Error publishing message:", err);
+  const gameLog = await declareAndBind(
+    connection,
+    ExchangePerilTopic,
+    GameLogSlug,
+    `${GameLogSlug}.*`,
+    SimpleQueueType.Durable,
+  );
+
+  printServerHelp();
+  while (true) {
+    const userInput = await getInput();
+    if (userInput.length == 0) {
+      continue;
+    }
+
+    if (userInput[0] == "pause") {
+      console.log("Sending pause message");
+      try {
+        await publishJSON(chConfirm, ExchangePerilDirect, PauseKey, {
+          isPaused: true,
+        });
+      } catch (err) {
+        console.error("Error publishing message:", err);
+      }
+      continue;
+    }
+
+    if (userInput[0] == "resume") {
+      console.log("Sending resume message");
+      try {
+        await publishJSON(chConfirm, ExchangePerilDirect, PauseKey, {
+          isPaused: false,
+        });
+      } catch (err) {
+        console.error("Error publishing message:", err);
+      }
+      continue;
+    }
+    if (userInput[0] == "quit") {
+      console.log("Exiting...");
+      process.exit(0);
+    }
+    console.log(`Command ${userInput[0]} not recognised`);
   }
 }
 
