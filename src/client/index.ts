@@ -13,12 +13,14 @@ import {
   clientWelcome,
   commandStatus,
   getInput,
+  getMaliciousLog,
   printClientHelp,
 } from "../internal/gamelogic/gamelogic.js";
 import {
   ArmyMovesPrefix,
   ExchangePerilDirect,
   ExchangePerilTopic,
+  GameLogSlug,
   PauseKey,
   WarRecognitionsPrefix,
 } from "../internal/routing/routing.js";
@@ -126,7 +128,24 @@ async function main() {
     }
 
     if (command == "spam") {
-      console.log("Spamming not allowed yet!");
+      if (userInput.length !== 2) {
+        console.log("Command: spam <number>");
+        continue;
+      }
+      const count = Number(userInput[1]);
+      if (Number.isNaN(count)) {
+        console.log("Command: spam <number>");
+        continue;
+      }
+      for (let i = 0; i < count; i++) {
+        const msg = getMaliciousLog();
+        publishMsgPack(
+          confCh,
+          ExchangePerilTopic,
+          `${GameLogSlug}.${username}`,
+          msg,
+        );
+      }
       continue;
     }
 

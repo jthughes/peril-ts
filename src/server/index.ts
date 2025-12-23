@@ -55,7 +55,10 @@ async function main() {
     SimpleQueueType.Durable,
     handlerLogs,
   );
-
+  if (!process.stdin.isTTY) {
+    console.log("Non-interactive mode: skipping command input.");
+    return;
+  }
   printServerHelp();
   while (true) {
     const userInput = await getInput();
