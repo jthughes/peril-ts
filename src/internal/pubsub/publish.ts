@@ -30,7 +30,7 @@ export async function declareAndBind(
     durable: queueType == SimpleQueueType.Durable,
     autoDelete: queueType == SimpleQueueType.Transient,
     exclusive: queueType == SimpleQueueType.Transient,
-    arguments: null,
+    arguments: { "x-dead-letter-exchange": "peril_dlx" },
   });
 
   ch.bindQueue(queueName, exchange, key);
