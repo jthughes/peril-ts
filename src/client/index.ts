@@ -1,15 +1,20 @@
 import amqp from "amqplib";
+import { GameState } from "../internal/gamelogic/gamestate.js";
+import { commandMove } from "../internal/gamelogic/move.js";
+import { commandSpawn } from "../internal/gamelogic/spawn.js";
+import { subscribeJSON } from "../internal/pubsub/subscribe.js";
+import {
+  publishJSON,
+  publishMsgPack,
+  SimpleQueueType,
+} from "../internal/pubsub/publish.js";
+import { handlerMove, handlerPause, handlerWar } from "./handlers.js";
 import {
   clientWelcome,
   commandStatus,
   getInput,
   printClientHelp,
 } from "../internal/gamelogic/gamelogic.js";
-import { GameState } from "../internal/gamelogic/gamestate.js";
-import { commandMove } from "../internal/gamelogic/move.js";
-import { commandSpawn } from "../internal/gamelogic/spawn.js";
-import { publishJSON, SimpleQueueType } from "../internal/pubsub/publish.js";
-import { subscribeJSON } from "../internal/pubsub/subscribe.js";
 import {
   ArmyMovesPrefix,
   ExchangePerilDirect,
@@ -17,7 +22,6 @@ import {
   PauseKey,
   WarRecognitionsPrefix,
 } from "../internal/routing/routing.js";
-import { handlerMove, handlerPause, handlerWar } from "./handlers.js";
 
 async function main() {
   console.log("Starting Peril client...");
@@ -68,7 +72,7 @@ async function main() {
     WarRecognitionsPrefix,
     `${WarRecognitionsPrefix}.*`,
     SimpleQueueType.Durable,
-    handlerWar(state),
+    handlerWar(state, confCh),
   );
 
   while (true) {

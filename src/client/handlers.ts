@@ -1,5 +1,6 @@
 // import { ConfirmChannel } from "amqplib";
 // import { RecognitionOfWar } from "../internal/gamelogic/gamedata.js";
+// import { ConfirmChannel } from "amqplib";
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { handleMove, MoveOutcome } from "../internal/gamelogic/move.js";
 import { handlePause } from "../internal/gamelogic/pause.js";
@@ -10,6 +11,7 @@ import {
   ExchangePerilTopic,
   WarRecognitionsPrefix,
 } from "../internal/routing/routing.js";
+import { publishGameLog } from "./publish.js";
 
 export function handlerPause(gs: GameState): (ps: PlayingState) => AckType {
   return (ps: PlayingState) => {
@@ -54,18 +56,43 @@ export function handlerMove(gs: GameState, ch: ConfirmChannel) {
 
 export function handlerWar(
   gs: GameState,
+  ch: ConfirmChannel,
 ): (war: RecognitionOfWar) => Promise<AckType> {
   return async (war: RecognitionOfWar): Promise<AckType> => {
     try {
       const resolution = handleWar(gs, war);
+      let msg = "";
       switch (resolution.result) {
         case WarOutcome.NotInvolved:
           return AckType.NackRequeue;
         case WarOutcome.NoUnits:
           return AckType.NackDiscard;
         case WarOutcome.OpponentWon:
+          msg = `${resolution.winner} won a war againt ${resolution.loser}`;
+          try {
+            publishGameLog(ch, gs.getUsername(), msg);
+          } catch (err) {
+            console.log("Error publishing log:", err);
+            return AckType.NackRequeue;
+          }
+          return AckType.Ack;
         case WarOutcome.YouWon:
+          msg = `${resolution.winner} won a war againt ${resolution.loser}`;
+          try {
+            publishGameLog(ch, gs.getUsername(), msg);
+          } catch (err) {
+            console.log("Error publishing log:", err);
+            return AckType.NackRequeue;
+          }
+          return AckType.Ack;
         case WarOutcome.Draw:
+          msg = `A war between ${resolution.attacker} and ${resolution.defender} resulted in a draw`;
+          try {
+            publishGameLog(ch, gs.getUsername(), msg);
+          } catch (err) {
+            console.log("Error publishing log:", err);
+            return AckType.NackRequeue;
+          }
           return AckType.Ack;
         default:
           const unreachable: never = resolution;
